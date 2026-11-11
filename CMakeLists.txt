@@ -24,6 +24,7 @@ add_executable(aegis_tests
     src/Altimeter.cpp
     src/FlightComputer.cpp
     src/FlightDataRecorder.cpp
+    src/FlightInvestigator.cpp
 )
 
 target_include_directories(aegis_tests PRIVATE include)
@@ -31,4 +32,14 @@ target_include_directories(aegis_tests PRIVATE include)
 add_test(
     NAME FlightComputerTests
     COMMAND aegis_tests
+)
+
+add_executable(aegis_investigator
+    src/investigator_main.cpp
+    src/FlightInvestigator.cpp
+    src/FlightDataRecorder.cpp
+)
+
+target_include_directories(
+    aegis_investigator PRIVATE include
 )

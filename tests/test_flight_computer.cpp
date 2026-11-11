@@ -3,6 +3,7 @@
 #include "Altimeter.h"
 #include "FlightComputer.h"
 #include "FlightDataRecorder.h"
+#include "FlightInvestigator.h"
 
 #include <cmath>
 #include <cstdio>
@@ -252,6 +253,243 @@ bool testFdrInvalidFile() {
 }
 
 
+bool testInvestigatorLoadsRecording() {
+    const std::string filename = "test_investigator.fdr";
+
+    FlightSample sample{};
+    sample.timestamp_sec = 0.0;
+    sample.state.altitude_ft = 10000.0;
+
+    if (!FlightDataRecorder::save(filename, {sample})) {
+        return false;
+    }
+
+    FlightInvestigator investigator;
+    bool loaded = investigator.loadRecording(filename);
+
+    std::remove(filename.c_str());
+
+    return loaded && investigator.getSampleCount() == 1;
+}
+
+
+bool testInvestigatorTimestamp() {
+    const std::string filename = "test_timestamp.fdr";
+
+    FlightSample first{};
+    first.timestamp_sec = 10.0;
+    first.state.altitude_ft = 10000.0;
+
+    FlightSample second{};
+    second.timestamp_sec = 20.0;
+    second.state.altitude_ft = 9500.0;
+
+    if (!FlightDataRecorder::save(
+            filename, {first, second})) {
+        return false;
+    }
+
+    FlightInvestigator investigator;
+    bool loaded = investigator.loadRecording(filename);
+
+    std::remove(filename.c_str());
+
+    if (!loaded) {
+        return false;
+    }
+
+    const FlightSample* sample =
+        investigator.inspect(19.8);
+
+    return sample != nullptr &&
+           sample->timestamp_sec == 20.0 &&
+           sample->state.altitude_ft == 9500.0;
+}
+
+
+bool testInvestigatorFault() {
+    const std::string filename = "test_fault.fdr";
+
+    FlightSample healthy{};
+    healthy.timestamp_sec = 37.0;
+    healthy.state.altitude_ft = 10000.0;
+    healthy.measured_altitude_ft = 10000.0;
+    healthy.altimeter_fault_active = false;
+
+    FlightSample faulty{};
+    faulty.timestamp_sec = 38.0;
+    faulty.state.altitude_ft = 10000.0;
+    faulty.measured_altitude_ft = 10350.0;
+    faulty.altimeter_fault_active = true;
+
+    if (!FlightDataRecorder::save(
+            filename, {healthy, faulty})) {
+        return false;
+    }
+
+    FlightInvestigator investigator;
+    bool loaded = investigator.loadRecording(filename);
+
+    std::remove(filename.c_str());
+
+    if (!loaded) {
+        return false;
+    }
+
+    const FlightSample* sample =
+        investigator.inspect(38.0);
+
+    return sample != nullptr &&
+           sample->altimeter_fault_active &&
+           sample->measured_altitude_ft -
+               sample->state.altitude_ft == 350.0;
+}
+
+bool testInvestigatorSurrounding() {
+    const std::string filename = "test_surrounding.fdr";
+
+    FlightSample first{};
+    first.timestamp_sec = 1.00;
+
+    FlightSample second{};
+    second.timestamp_sec = 1.02;
+
+    FlightSample third{};
+    third.timestamp_sec = 1.04;
+
+    if (!FlightDataRecorder::save(
+            filename, {first, second, third})) {
+        return false;
+    }
+
+    FlightInvestigator investigator;
+    bool loaded = investigator.loadRecording(filename);
+
+    std::remove(filename.c_str());
+
+    if (!loaded) {
+        return false;
+    }
+
+    InspectionResult result =
+        investigator.inspectSurrounding(1.03);
+
+    return result.exact == nullptr &&
+            result.before != nullptr &&
+            result.before->timestamp_sec == 1.02 &&
+            result.after != nullptr &&
+            result.after->timestamp_sec == 1.04 &&
+            result.outOfRange == false;
+}
+
+bool testInvestigatorExactMatch() {
+    const std::string filename = "test_exact_match.fdr";
+
+    FlightSample first{};
+    first.timestamp_sec = 1.00;
+
+    FlightSample second{};
+    second.timestamp_sec = 1.02;
+
+    FlightSample third{};
+    third.timestamp_sec = 1.04;
+
+    if (!FlightDataRecorder::save(
+            filename, {first, second, third})) {
+        return false;
+    }
+
+    FlightInvestigator investigator;
+    bool loaded = investigator.loadRecording(filename);
+
+    std::remove(filename.c_str());
+
+    if (!loaded) {
+        return false;
+    }
+
+    InspectionResult result =
+        investigator.inspectSurrounding(1.02);
+
+    return result.exact != nullptr &&
+            result.exact->timestamp_sec == 1.02 &&
+            result.before != nullptr &&
+            result.before->timestamp_sec == 1.00 &&
+            result.after == nullptr &&
+            result.outOfRange == false;
+}
+
+bool testInvestigatorLowerBoundary() {
+    const std::string filename = "test_lower_boundary.fdr";
+
+    FlightSample first{};
+    first.timestamp_sec = 1.00;
+
+    FlightSample second{};
+    second.timestamp_sec = 1.02;
+
+    FlightSample third{};
+    third.timestamp_sec = 1.04;
+
+    if (!FlightDataRecorder::save(
+            filename, {first, second, third})) {
+        return false;
+    }
+
+    FlightInvestigator investigator;
+    bool loaded = investigator.loadRecording(filename);
+
+    std::remove(filename.c_str());
+
+    if (!loaded) {
+        return false;
+    }
+
+    InspectionResult result =
+        investigator.inspectSurrounding(0.98);
+
+    return result.exact == nullptr &&
+            result.before == nullptr &&
+            result.after != nullptr &&
+            result.after->timestamp_sec == 1.00 &&
+            result.outOfRange == true;
+}
+
+bool testInvestigatorUpperBoundary() {
+    const std::string filename = "test_upper_boundary.fdr";
+
+    FlightSample first{};
+    first.timestamp_sec = 1.00;
+
+    FlightSample second{};
+    second.timestamp_sec = 1.02;
+
+    FlightSample third{};
+    third.timestamp_sec = 1.04;
+
+    if (!FlightDataRecorder::save(
+            filename, {first, second, third})) {
+        return false;
+    }
+
+    FlightInvestigator investigator;
+    bool loaded = investigator.loadRecording(filename);
+
+    std::remove(filename.c_str());
+
+    if (!loaded) {
+        return false;
+    }
+
+    InspectionResult result =
+        investigator.inspectSurrounding(1.06);
+
+    return result.exact == nullptr &&
+            result.before != nullptr &&
+            result.before->timestamp_sec == 1.04 &&
+            result.after == nullptr &&
+            result.outOfRange == true;
+}
 
 int main() {
     int passed = 0;
@@ -326,8 +564,59 @@ int main() {
         std::cout << "[FAIL] FDR Invalid File\n";
     }
 
-    std::cout << "\nTests passed: "
-              << passed << "/10\n";
 
-    return passed == 10 ? 0 : 1;
+    if (testInvestigatorLoadsRecording()) {
+        std::cout << "[PASS] Investigator loads recording\n";
+        ++passed;
+    } else {
+        std::cout << "[FAIL] Investigator loads recording\n";
+    }
+
+    if (testInvestigatorTimestamp()) {
+        std::cout << "[PASS] Investigator timestamp inspection\n";
+        ++passed;
+    } else {
+        std::cout << "[FAIL] Investigator timestamp inspection\n";
+    }
+
+    if (testInvestigatorFault()) {
+        std::cout << "[PASS] Investigator fault inspection\n";
+        ++passed;
+    } else {
+        std::cout << "[FAIL] Investigator fault inspection\n";
+    }
+
+    if (testInvestigatorSurrounding()) {
+        std::cout << "[PASS] Investigator surrounding samples\n";
+        ++passed;
+    } else {
+        std::cout << "[FAIL] Investigator surrounding samples\n";
+    }
+
+    if (testInvestigatorExactMatch()) {
+        std::cout << "[PASS] Investigator Exact Match\n";
+        ++passed;
+    } else {
+        std::cout << "[FAIL] Investigator Exact Match\n";
+    }
+
+    if (testInvestigatorLowerBoundary()) {
+        std::cout << "[PASS] Investigator Lower Boundary\n";
+        ++passed;
+    } else {
+        std::cout << "[FAIL] Investigator Lower Boundary\n";
+    }
+
+    if (testInvestigatorUpperBoundary()) {
+        std::cout << "[PASS] Investigator Upper Boundary\n";
+        ++passed;
+    } else {
+        std::cout << "[FAIL] Investigator Upper Boundary\n";
+    }
+
+
+    std::cout << "\nTests passed: "
+              << passed << "/17\n";
+
+    return passed == 17 ? 0 : 1;
 }

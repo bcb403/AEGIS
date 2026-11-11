@@ -1,3 +1,5 @@
+set -e
+
 echo "Building AEGIS..."
 
 cmake -S . -B build
