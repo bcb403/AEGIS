@@ -1,5 +1,6 @@
 
 #include "Aircraft.h"
+#include "Altimeter.h"
 #include "FlightComputer.h"
 
 #include <cmath>
@@ -7,6 +8,7 @@
 
 bool testSampleCount() {
     Aircraft aircraft;
+    Altimeter altimeter;
     FlightComputer computer;
 
     constexpr int frequency = 50;
@@ -14,7 +16,7 @@ bool testSampleCount() {
     constexpr double dt = 1.0 / frequency;
 
     for (int i = 0; i < frequency * duration; ++i) {
-        computer.sample(aircraft, i * dt);
+        computer.sample(aircraft, altimeter, i * dt);
         aircraft.update(dt);
     }
 
@@ -23,12 +25,13 @@ bool testSampleCount() {
 
 bool testTimestamps() {
     Aircraft aircraft;
+    Altimeter altimeter;
     FlightComputer computer;
 
     constexpr double dt = 0.02;
 
     for (int i = 0; i < 50; ++i) {
-        computer.sample(aircraft, i * dt);
+        computer.sample(aircraft, altimeter, i * dt);
     }
 
     const auto& samples = computer.getSamples();
@@ -53,9 +56,10 @@ bool testTimestamps() {
 
 bool testStateIntegrity() {
     Aircraft aircraft;
+    Altimeter altimeter;
     FlightComputer computer;
 
-    computer.sample(aircraft, 0.0);
+    computer.sample(aircraft, altimeter, 0.0);
 
     const auto& samples = computer.getSamples();
 
@@ -71,6 +75,23 @@ bool testStateIntegrity() {
            state.pitch_deg == 0.0 &&
            state.roll_deg == 0.0 &&
            state.vertical_speed_fpm == 0.0;
+}
+
+bool testAltimeterMeasurement() {
+    Aircraft aircraft;
+    Altimeter altimeter(0.0);
+    FlightComputer computer;
+
+    computer.sample(aircraft, altimeter, 0.0);
+
+    const auto& samples = computer.getSamples();
+
+    if (samples.size() != 1) {
+        return false;
+    }
+
+    return samples[0].measured_altitude_ft ==
+           samples[0].state.altitude_ft;
 }
 
 int main() {
@@ -97,8 +118,15 @@ int main() {
         std::cout << "[FAIL] State integrity\n";
     }
 
-    std::cout << "\nTests passed: "
-              << passed << "/3\n";
+    if(testAltimeterMeasurement()) {
+        std::cout << "[PASS] Altimeter Measurement\n";
+        ++passed;
+    } else {
+        std::cout << "[PASS] Altimeter Measurement\n";
+    }
 
-    return passed == 3 ? 0 : 1;
+    std::cout << "\nTests passed: "
+              << passed << "/4\n";
+
+    return passed == 4 ? 0 : 1;
 }

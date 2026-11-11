@@ -9,6 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_executable(aegis
     src/main.cpp
     src/Aircraft.cpp
+    src/Altimeter.cpp
     src/FlightComputer.cpp
 )
 
@@ -19,6 +20,7 @@ enable_testing()
 add_executable(aegis_tests
     tests/test_flight_computer.cpp
     src/Aircraft.cpp
+    src/Altimeter.cpp
     src/FlightComputer.cpp
 )
 
