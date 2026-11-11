@@ -16,6 +16,9 @@ int main() {
     constexpr double deltaTime = 1.0 / frequency;
     constexpr int totalSamples = frequency * duration;
 
+    constexpr int faultTimeSec = 38;
+    constexpr double faultBiasFt = 350.0;
+
     std::cout << std::fixed << std::setprecision(2);
 
     for (int i = 0; i < totalSamples; ++i) {
@@ -24,6 +27,16 @@ int main() {
         }
 
         double timestamp = i * deltaTime;
+
+        // Inject the fault exactly at T+38 seconds.
+        if (i == faultTimeSec * frequency) {
+            altimeter.injectBias(faultBiasFt);
+
+            std::cout
+                << "\n[EVENT] ALTIMETER BIAS FAULT INJECTED"
+                << " AT T+" << timestamp
+                << " s\n\n";
+        }
 
         flightComputer.sample(
             aircraft,
@@ -41,7 +54,10 @@ int main() {
                 << sample.state.altitude_ft
                 << " ft | Measured Alt: "
                 << sample.measured_altitude_ft
-                << " ft\n";
+                << " ft | Sensor: "
+                << (sample.altimeter_fault_active
+                    ? "FAULT" : "OK")
+                << "\n";
         }
     }
 

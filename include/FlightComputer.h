@@ -12,6 +12,7 @@ struct FlightSample {
     double timestamp_sec;
     AircraftState state;
     double measured_altitude_ft;
+    bool altimeter_fault_active;
 };
 
 class FlightComputer {

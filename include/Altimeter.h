@@ -10,9 +10,17 @@ public:
 
     double measure(double trueAltitudeFt);
 
+    void injectBias(double biasFt);
+    void clearFault();
+
+    bool hasFault() const;
+
 private:
     std::mt19937 generator;
     std::normal_distribution<double> noise;
+
+    double bias_ft = 0.0;
+    bool faultActive = false;
 };
 
 #endif

@@ -14,7 +14,8 @@ void FlightComputer::sample(
     FlightSample newSample{
         timestamp_sec,
         aircraft.getState(),
-        measuredAltitude
+        measuredAltitude,
+        altimeter.hasFault()
     };
 
     samples.push_back(newSample);

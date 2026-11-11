@@ -94,6 +94,68 @@ bool testAltimeterMeasurement() {
            samples[0].state.altitude_ft;
 }
 
+
+bool testBiasInjection() {
+    Altimeter altimeter(0.0);
+
+    double normal = altimeter.measure(10000.0);
+
+    altimeter.injectBias(350.0);
+
+    double faulty = altimeter.measure(10000.0);
+
+    return normal == 10000.0 &&
+           faulty == 10350.0 &&
+           altimeter.hasFault();
+}
+
+
+bool testFaultRecovery() {
+    Altimeter altimeter(0.0);
+
+    altimeter.injectBias(350.0);
+    altimeter.clearFault();
+
+    return !altimeter.hasFault() &&
+           altimeter.measure(10000.0) == 10000.0;
+}
+
+
+bool testHistoricalSampleIntegrity() {
+    Aircraft aircraft;
+    Altimeter altimeter(0.0);
+    FlightComputer computer;
+
+    computer.sample(aircraft, altimeter, 0.0);
+
+    altimeter.injectBias(350.0);
+    computer.sample(aircraft, altimeter, 1.0);
+
+    const auto& samples = computer.getSamples();
+
+    if (samples.size() != 2) {
+        return false;
+    }
+
+    bool firstSampleHealthy =
+        samples[0].measured_altitude_ft == 10000.0 &&
+        !samples[0].altimeter_fault_active;
+
+    bool secondSampleFaulty =
+        samples[1].measured_altitude_ft == 10350.0 &&
+        samples[1].altimeter_fault_active;
+
+    bool aircraftUnchanged =
+        samples[0].state.altitude_ft == 10000.0 &&
+        samples[1].state.altitude_ft == 10000.0;
+
+    return firstSampleHealthy &&
+           secondSampleFaulty &&
+           aircraftUnchanged;
+}
+
+
+
 int main() {
     int passed = 0;
 
@@ -122,11 +184,32 @@ int main() {
         std::cout << "[PASS] Altimeter Measurement\n";
         ++passed;
     } else {
-        std::cout << "[PASS] Altimeter Measurement\n";
+        std::cout << "[FAIL] Altimeter Measurement\n";
+    }
+
+    if(testBiasInjection()) {
+        std::cout << "[PASS] Bias Injection\n";
+        ++passed;
+    } else {
+        std::cout << "[FAIL] Bias Injection\n";
+    }
+
+    if(testFaultRecovery()) {
+        std::cout << "[PASS] Fault Recovery\n";
+        ++passed;
+    } else {
+        std::cout << "[FAIL] Fault Recovery\n";
+    }
+
+    if(testHistoricalSampleIntegrity()) {
+        std::cout << "[PASS] Historical State Integrity\n";
+        ++passed;
+    } else {
+        std::cout << "[FAIL] Historical State Integrity\n";
     }
 
     std::cout << "\nTests passed: "
-              << passed << "/4\n";
+              << passed << "/7\n";
 
-    return passed == 4 ? 0 : 1;
+    return passed == 7 ? 0 : 1;
 }
