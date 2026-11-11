@@ -2,9 +2,12 @@
 #include "Aircraft.h"
 #include "Altimeter.h"
 #include "FlightComputer.h"
+#include "FlightDataRecorder.h"
 
 #include <iomanip>
 #include <iostream>
+#include <string>
+#include <vector>
 
 int main() {
     Aircraft aircraft;
@@ -28,7 +31,6 @@ int main() {
 
         double timestamp = i * deltaTime;
 
-        // Inject the fault exactly at T+38 seconds.
         if (i == faultTimeSec * frequency) {
             altimeter.injectBias(faultBiasFt);
 
@@ -66,6 +68,31 @@ int main() {
         << "Recorded samples: "
         << flightComputer.getSampleCount()
         << "\n";
+
+    const std::string filename = "flight_001.fdr";
+
+    if (!FlightDataRecorder::save(
+            filename,
+            flightComputer.getSamples())) {
+        std::cerr << "[ERROR] Failed to save flight recording\n";
+        return 1;
+    }
+
+    std::cout << "[FDR] Flight recording saved: "
+              << filename << "\n";
+
+    std::vector<FlightSample> recoveredSamples;
+
+    if (!FlightDataRecorder::load(
+            filename,
+            recoveredSamples)) {
+        std::cerr << "[ERROR] Failed to load flight recording\n";
+        return 1;
+    }
+
+    std::cout << "[FDR] Recording verified and loaded\n";
+    std::cout << "[FDR] Recovered samples: "
+              << recoveredSamples.size() << "\n";
 
     return 0;
 }

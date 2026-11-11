@@ -11,6 +11,7 @@ add_executable(aegis
     src/Aircraft.cpp
     src/Altimeter.cpp
     src/FlightComputer.cpp
+    src/FlightDataRecorder.cpp
 )
 
 target_include_directories(aegis PRIVATE include)
@@ -22,6 +23,7 @@ add_executable(aegis_tests
     src/Aircraft.cpp
     src/Altimeter.cpp
     src/FlightComputer.cpp
+    src/FlightDataRecorder.cpp
 )
 
 target_include_directories(aegis_tests PRIVATE include)

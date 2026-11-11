@@ -2,9 +2,13 @@
 #include "Aircraft.h"
 #include "Altimeter.h"
 #include "FlightComputer.h"
+#include "FlightDataRecorder.h"
 
 #include <cmath>
+#include <cstdio>
+#include <fstream>
 #include <iostream>
+#include <vector>
 
 bool testSampleCount() {
     Aircraft aircraft;
@@ -155,6 +159,99 @@ bool testHistoricalSampleIntegrity() {
 }
 
 
+bool testFdrRoundTrip() {
+    Aircraft aircraft;
+    Altimeter altimeter(0.0);
+    FlightComputer computer;
+
+    computer.sample(aircraft, altimeter, 0.0);
+
+    altimeter.injectBias(350.0);
+    computer.sample(aircraft, altimeter, 0.02);
+
+    const std::string filename = "test_roundtrip.fdr";
+
+    if (!FlightDataRecorder::save(
+            filename, computer.getSamples())) {
+        return false;
+    }
+
+    std::vector<FlightSample> recovered;
+    bool loaded =
+        FlightDataRecorder::load(filename, recovered);
+
+    std::remove(filename.c_str());
+
+    if (!loaded || recovered.size() != 2) {
+        return false;
+    }
+
+    return recovered[0].timestamp_sec == 0.0 &&
+           recovered[0].state.altitude_ft == 10000.0 &&
+           recovered[0].measured_altitude_ft == 10000.0 &&
+           !recovered[0].altimeter_fault_active &&
+           recovered[1].timestamp_sec == 0.02 &&
+           recovered[1].state.altitude_ft == 10000.0 &&
+           recovered[1].measured_altitude_ft == 10350.0 &&
+           recovered[1].altimeter_fault_active;
+}
+
+
+bool testFdrCorruptionDetection() {
+    const std::string filename = "test_corrupt.fdr";
+
+    FlightSample sample{};
+    sample.timestamp_sec = 0.0;
+    sample.state.altitude_ft = 10000.0;
+
+    if (!FlightDataRecorder::save(filename, {sample})) {
+        return false;
+    }
+
+    std::fstream file(
+        filename,
+        std::ios::binary | std::ios::in | std::ios::out
+    );
+
+    if (!file) {
+        std::remove(filename.c_str());
+        return false;
+    }
+
+    file.seekp(20);
+    char corruptByte = static_cast<char>(0xFF);
+    file.write(&corruptByte, 1);
+    file.close();
+
+    std::vector<FlightSample> recovered;
+    bool loaded =
+        FlightDataRecorder::load(filename, recovered);
+
+    std::remove(filename.c_str());
+
+    return !loaded;
+}
+
+
+bool testFdrInvalidFile() {
+    const std::string filename = "test_invalid.fdr";
+
+    {
+        std::ofstream file(filename, std::ios::binary);
+        file << "NOT_A_VALID_AEGIS_RECORDING";
+    }
+
+    std::vector<FlightSample> recovered;
+
+    bool loaded =
+        FlightDataRecorder::load(filename, recovered);
+
+    std::remove(filename.c_str());
+
+    return !loaded;
+}
+
+
 
 int main() {
     int passed = 0;
@@ -208,8 +305,29 @@ int main() {
         std::cout << "[FAIL] Historical State Integrity\n";
     }
 
-    std::cout << "\nTests passed: "
-              << passed << "/7\n";
+    if(testFdrRoundTrip()) {
+        std::cout << "[PASS] FDR round-trip\n";
+        ++passed;
+    } else {
+        std::cout << "[FAIL] FDR round-trip\n";
+    }
 
-    return passed == 7 ? 0 : 1;
+    if(testFdrCorruptionDetection()) {
+        std::cout << "[PASS] FDR Corruption Detection\n";
+        ++passed;
+    } else {
+        std::cout << "[FAIL] FDR Corruption Detection\n";
+    }
+
+    if(testFdrInvalidFile()) {
+        std::cout << "[PASS] FDR Invalid File\n";
+        ++passed;
+    } else {
+        std::cout << "[FAIL] FDR Invalid File\n";
+    }
+
+    std::cout << "\nTests passed: "
+              << passed << "/10\n";
+
+    return passed == 10 ? 0 : 1;
 }
